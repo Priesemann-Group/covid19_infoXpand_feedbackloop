@@ -1,23 +1,22 @@
 import numpy as np
-from matplotlib import pyplot as plt
-from scipy.special import gamma as gamma_func
-import matplotlib as mpl
-import cosmodata 
-import parameters_agegroups
-from scipy.optimize import curve_fit
 import pandas as pd
+from matplotlib import pyplot as plt
+import matplotlib as mpl
+from scipy.special import gamma as gamma_func
 from scipy.stats import pearsonr
+from scipy.optimize import curve_fit
+
+import parameters
+import cosmodata
 
 
 def set_rcParams(arial=False):
-    # reset defaults
-    mpl.rcParams.update(mpl.rcParamsDefault)
+    mpl.rcParams.update(mpl.rcParamsDefault) # reset defaults
 
     if arial:
         mpl.rcParams['font.family'] = "sans-serif"
         mpl.rcParams['font.sans-serif'] = "Arial"
 
-    #mpl.rcParams['axes.linewidth'] = 0.3
     mpl.rcParams["axes.labelcolor"] = "black"
     mpl.rcParams["axes.edgecolor"] = "black"
     mpl.rcParams["xtick.color"] = "black"
@@ -30,100 +29,11 @@ def set_rcParams(arial=False):
     mpl.rcParams["ytick.labelsize"] = 8
     mpl.rcParams["axes.labelsize"] = 10
     mpl.rcParams["axes.titlesize"]= 10
-    mpl.rcParams["legend.fontsize"] = 8
+    mpl.rcParams["legend.fontsize"] = 7
     mpl.rcParams["legend.title_fontsize"] = 10
 
 
-def overview(model, path=None, silent=False, arial=False):
-    set_rcParams(arial=arial)
-    mpl.rcParams["legend.fontsize"] = 7
-    t = model.times
-    data = model.chopped_data().sum(axis=2)
-    AGdata = model.chopped_data()
-
-    fig = plt.figure(figsize=(6, 3.5), constrained_layout=True)
-    grid = fig.add_gridspec(ncols=3, nrows=2, hspace=0.2, wspace=0.15)
-    
-    ax1 = fig.add_subplot(grid[0])
-    ax2 = fig.add_subplot(grid[1],sharex=ax1)
-    ax3 = fig.add_subplot(grid[2],sharex=ax1)
-    ax4 = fig.add_subplot(grid[3],sharex=ax1)
-    ax5 = fig.add_subplot(grid[4],sharex=ax1)
-    ax6 = fig.add_subplot(grid[5],sharex=ax1)
-    
-    
-    ax1.plot(t,data[:,0]/1e6,label="S")
-    ax1.plot(t,data[:,1]/1e6,label="V")
-    ax1.plot(t,data[:,2]/1e6,label="Wn")
-    ax1.plot(t,data[:,3]/1e6,label="Wv")
-    ax1.plot(t,data[:,12]/1e6,label="R")
-    ax1.plot(t,data[:,13]/1e6,label="Rv")
-    ax1.set_ylim(0,None)
-    ax1.set_ylabel("fraction of population")
-    ax1.legend(loc='upper left', ncol=2, handlelength=1.)
-    
-    ax2.plot(t,data[:,4],label="E")
-    ax2.plot(t,data[:,5],label="EBn")
-    ax2.plot(t,data[:,6],label="EBv")
-    ax2.set_ylim(0,None)
-    ax2.legend(loc='upper left', ncol=2, handlelength=1.)
-    
-    ax3.plot(t,data[:,10],label="ICU")
-    ax3.plot(t,data[:,11],label="ICUv")
-#    ax3.plot(t,list(map(model.H_Rt, t)), label="H_Rt")
-    ax3.plot(t,list(map(model.H_vac1, t)), label="H_vac1")
-#    ax3.plot(t,list(map(model.H_vac2, t)), label="H_vac2")
-    ax3.set_ylim(0,None)
-    ax3.legend(loc='upper left', ncol=2, handlelength=1.)
-    
-    ax4.plot(t, list(map(model.Rt, t)), label='Rt')
-    ax4.plot(t, list(map(model.Gamma, t)), label='season.')
-    ax4.set_ylabel("reproduction number")
-    ax4.legend(loc='upper left', ncol=2, handlelength=1.)
-    
-    ax5.plot(t, list(map(model.u_w, t)), label='u_w')
-    ax5.plot(t, data[:,14]/model.M.sum(), label='u_c')
-    ax5.plot(t, list(map(model.w_w, t)), label='w_w')
-    ax5.plot(t, data[:,15]/data[:,14], label='w_c')
-    ax5.set_ylim(0,None)
-    ax5.set_xlabel("days")
-    ax5.set_ylabel("fraction of population")
-    ax5.legend(loc='upper left', ncol=2, handlelength=1.)
-    
-#    d1a = (np.array(list(map(model.Phi, t+model.tau_vac1, AGdata[:,14,:])))).sum(axis=1)
-#    d1b = (np.array(list(map(model.Phi, t+model.tau_vac1/2., AGdata[:,14,:])))).sum(axis=1)
-#    d2 = (np.array(list(map(model.phi, t+model.tau_vac2, AGdata[:,14,:], AGdata[:,15,:])))).sum(axis=1)
-#    ax6.plot(t, d1a, label='1.dose A')
-#    ax6.plot(t, d1b, label='1.dose B')
-    phis = np.array(list(map(model.get_phis, t, AGdata))).sum(axis=(2,3))
-    shift = round(model.tau_vac1/model.step_size)
-    d1a = np.roll(phis[:,0], -shift)
-    d1a[-shift:] = 0
-    shift = round(model.tau_vac1/2./model.step_size)
-    d1b = np.roll(phis[:,0], -shift)
-    d1b[-shift:] = 0
-    shift = round(model.tau_vac2/model.step_size)
-    d2 = np.roll(phis[:,1], -shift)
-    d2[-shift:] = 0
-    ax6.plot(t, d1a, label='1.dose A')
-    ax6.plot(t, d1b, label='1.dose B')
-    ax6.plot(t, d2, label='2.dose')
-    ax6.set_ylim(0,None)
-    ax6.set_ylabel("daily vaccinations")
-    ax6.legend(loc='upper left', ncol=2, handlelength=1.)
-    
-    for ax in [ax1,ax2,ax3,ax4,ax5,ax6]:
-        l,u = ax.get_ylim()
-        ax.set_ylim(l,u+0.4*(u-l))
-    
-    fig.align_ylabels()
-    
-    if not silent: plt.show()
-    if path!=None: fig.savefig(path)
-
-
-
-def overview_agegroups(model, path=None, silent=False, arial=False):
+def overview_agegroups(model, path=None, silent=False, arial=False, scen=1):
     set_rcParams(arial=arial)
     t = model.times
     M = model.M
@@ -132,9 +42,15 @@ def overview_agegroups(model, path=None, silent=False, arial=False):
     ags = AGdata.shape[2]
 
     colors = mpl.cm.viridis_r(np.linspace(0.,1.,ags))
+    scen_colors = {
+        1: '#1B1919FF',
+        2: '#484343FF',
+        3: '#00468BFF',
+        4: '#0099B4FF',
+        5: '#46DCBAFF'}
 
 
-    fig = plt.figure(figsize=(8, 9), constrained_layout=True)
+    fig = plt.figure(figsize=(6, 8), constrained_layout=True)
     grid = fig.add_gridspec(ncols=3, nrows=5, hspace=0.1, wspace=0.1)
     
 
@@ -145,21 +61,16 @@ def overview_agegroups(model, path=None, silent=False, arial=False):
     ax5 = fig.add_subplot(grid[4],sharex=ax1)
     ax6 = fig.add_subplot(grid[5],sharex=ax1)
     ax7 = fig.add_subplot(grid[6],sharex=ax1)
-    ax8 = fig.add_subplot(grid[7],sharex=ax1, sharey=ax7)
-    ax9 = fig.add_subplot(grid[8],sharex=ax1, sharey=ax7)
+    ax8 = fig.add_subplot(grid[7],sharex=ax1)
+    ax9 = fig.add_subplot(grid[8],sharex=ax1)
     ax10 = fig.add_subplot(grid[9],sharex=ax1)
-    ax11 = fig.add_subplot(grid[10],sharex=ax1)
-    ax12 = fig.add_subplot(grid[11],sharex=ax1)
+    ax11 = fig.add_subplot(grid[10],sharex=ax1, sharey=ax10)
+    ax12 = fig.add_subplot(grid[11],sharex=ax1, sharey=ax10)
     ax13 = fig.add_subplot(grid[12],sharex=ax1)
     ax14 = fig.add_subplot(grid[13],sharex=ax1)
     ax15 = fig.add_subplot(grid[14],sharex=ax1)
 
     axs = [ax1,ax2,ax4,ax5,ax6,ax7,ax8,ax9,ax10,ax11,ax12,ax13,ax14,ax15]
-#    titles = ['Incidence','Breakthrough share\nof incidence','',
-#              'ICU occupancy','Breakthrough share\nnof ICU occupancy','Daily new deaths',
-#              'Susceptible','Immune (vac.+natural)','Waned immunity',
-#              'vac 1a','vac 2','vac total']
-
     # (S,V,Wn,Wv,E,EBn,EBv,I,IBn,IBv,ICU,ICUv,R,Rv,UC,WC,D,C)
 
     # Theta*I + (1-kappa)*Theta*(IBn+IBv) + Theta_ICU*(ICU+ICUv)
@@ -177,59 +88,59 @@ def overview_agegroups(model, path=None, silent=False, arial=False):
     shift = round(model.tau_vac2/model.step_size)
     d2 = np.roll(phis[:,1,:], -shift, axis=0)
     d2[-shift:,:] = 0
+    def NPI(t):
+        return max(np.linalg.eigvals((np.moveaxis(model.Cs,0,2) * model.k_lowH(t)).sum(axis=2)))
     def Rt(t):
         #Stapel aus 6x6 Matrizen, 4 lang. Elementweise gewichtete Addition und anschließende Summation über Zeilen
         return np.matmul( (np.moveaxis(model.Cs,0,2) * model.k_selfregulation(t)).sum(axis=2), np.ones(6) )
 
 
     for ag in range(ags):
-        #ax1.plot(t,model.rho*(AGdata[:,4,ag]+AGdata[:,5,ag]+AGdata[:,6,ag])/(M[ag]/1e6), color=colors[ag])
-        ax1.plot(t,model.rho*(AGdata[:,4,ag]+AGdata[:,5,ag]+AGdata[:,6,ag])/1e6, color=colors[ag])
-        ax2.plot(t,(AGdata[:,6,ag])/(AGdata[:,4,ag]+AGdata[:,5,ag]+AGdata[:,6,ag]), color=colors[ag])
-        ax14.plot(t, (AGdata[:,10,ag]+AGdata[:,11,ag])/ (AGdata[:,10,:]+AGdata[:,11,:]).sum(axis=1) , color=colors[ag])
+        ax1.plot(t,list(map(NPI,t)), color=scen_colors[scen])
+        ax2.plot(t,model.Gamma(t) * np.array(list(map(Rt,t)))[:,ag], color=colors[ag])
         # ax3 legend
-        #ax4.plot(t,(AGdata[:,10,ag]+AGdata[:,11,ag])/(M[ag]/1e6), color=colors[ag])
-        ax4.plot(t,(AGdata[:,10,ag]+AGdata[:,11,ag])/(M[ag]/1e6), color=colors[ag])
-        ax5.plot(t,AGdata[:,11,ag]/(AGdata[:,10,ag]+AGdata[:,11,ag]), color=colors[ag])
-#        ax6.plot(t,dD[:,ag]/(M[ag]/1e6), color=colors[ag])
-        ax6.plot(t,AGdata[:,16,ag], color=colors[ag])
-        ax7.plot(t,AGdata[:,0,ag]/M[ag], color=colors[ag])
-        ax8.plot(t,(AGdata[:,1,ag]+AGdata[:,12,ag]+AGdata[:,13,ag])/M[ag], color=colors[ag])
-        ax9.plot(t,(AGdata[:,2,ag]+AGdata[:,3,ag])/M[ag], color=colors[ag])
-        ax10.plot(t,d1a[:,ag]/(M[ag]/1e6), color=colors[ag])
-        ax11.plot(t,d2[:,ag]/(M[ag]/1e6), color=colors[ag])
-        ax12.plot(t,(d1a[:,ag]+d1b[:,ag]+d2[:,ag]), color=colors[ag])
-        ax13.plot(t,np.array(list(map(Rt,t)))[:,ag], color=colors[ag])
+        ax4.plot(t,model.rho*(AGdata[:,4,ag]+AGdata[:,5,ag]+AGdata[:,6,ag])/(M[ag]/1e6), color=colors[ag])
+        ax5.plot(t,(AGdata[:,6,ag])/(AGdata[:,4,ag]+AGdata[:,5,ag]+AGdata[:,6,ag]), color=colors[ag])
+        ax6.plot(t,AGdata[:,16,ag]+AGdata[:,17,ag], color=colors[ag])
+        ax7.plot(t,(AGdata[:,10,ag]+AGdata[:,11,ag])/(M[ag]/1e6), color=colors[ag])
+        ax8.plot(t,AGdata[:,11,ag]/(AGdata[:,10,ag]+AGdata[:,11,ag]), color=colors[ag])
+        ax9.plot(t, (AGdata[:,10,ag]+AGdata[:,11,ag])/ (AGdata[:,10,:]+AGdata[:,11,:]).sum(axis=1) , color=colors[ag])
+        ax10.plot(t,AGdata[:,0,ag]/M[ag], color=colors[ag])
+        ax11.plot(t,(AGdata[:,1,ag]+AGdata[:,12,ag]+AGdata[:,13,ag])/M[ag], color=colors[ag])
+        ax12.plot(t,(AGdata[:,2,ag]+AGdata[:,3,ag])/M[ag], color=colors[ag])
+        ax13.plot(t,d1a[:,ag]/(M[ag]/1e6), color=colors[ag])
+        ax14.plot(t,d2[:,ag]/(M[ag]/1e6), color=colors[ag])
+        ax15.plot(t,(d1a[:,ag]+d1b[:,ag]+d2[:,ag]), color=colors[ag])
+
+        #ax13.plot(t,np.array(list(map(Rt,t)))[:,ag], color=colors[ag])
         #ax14.plot(t,model.Gamma(t), color='black')
-        ax15.plot(t,model.beta/model.gamma[ag] * model.Gamma(t) * np.array(list(map(Rt,t)))[:,ag], color=colors[ag])
+        #ax15.plot(t,model.beta/model.gamma[ag] * model.Gamma(t) * np.array(list(map(Rt,t)))[:,ag], color=colors[ag])
 
     for i,ax in enumerate(axs):
 #        ax.set_title(titles[i])
         ax.set_ylim(0,None)
 
-    #ax1.set_ylabel("Daily new cases\nper million in age group")
-    ax1.set_ylabel("Daily new cases per\n 1e6 in total population")
-    ax2.set_ylabel("Breakthrough share\nof daily new cases")
+    ax1.set_ylabel("Contact level\ninfluenced by NPIs")
+    ax2.set_ylabel("Contacts including\nreduction and seasonality")
     #ax3 legend
-    ax4.set_ylabel("ICU occupancy per\n 1e6 in total population")
-    #ax4.set_ylabel("ICU occupancy\nper million in age group")
-    ax5.set_ylabel("Breakthrough share\nof ICU occupancy")
+    ax4.set_ylabel("Daily new cases\nper million in age group")
+    ax5.set_ylabel("Share of reinfections\nof daily new cases")
     ax6.set_ylabel("Cumulative deaths\nper million of population")
-    ax7.set_ylabel("Susceptible fraction\nof the population")
-    ax8.set_ylabel("Immune fraction\nof the population")
-    ax9.set_ylabel("Waned immune fraction\nof the population")
-    ax10.set_ylabel("Daily first-time vac.\nper million in age group")
-    ax11.set_ylabel("Daily booster vac.\nper million in age group")
-    ax12.set_ylabel("Daily total vac.\nper million of population")
-    ax13.set_ylabel("Contacts")
-    ax14.set_ylabel("Share of total ICU\npatients")
-    #ax14.set_ylabel("Seasonality")
-    ax15.set_ylabel("Total gross Rt")
+    ax7.set_ylabel("ICU occupancy\nper million in age group")
+    ax8.set_ylabel("Share of reinfections\nof ICU occupancy")
+    ax9.set_ylabel("Share of total\nICU patients")
+    ax10.set_ylabel("Susceptible fraction\nof the population")
+    ax11.set_ylabel("Immune fraction\nof the population")
+    ax12.set_ylabel("Waned immune fraction\nof the population")
+    ax13.set_ylabel("Daily first-time vac.\nper million in age group")
+    ax14.set_ylabel("Daily booster vac.\nper million in age group")
+    ax15.set_ylabel("Daily total vac.\nper million of population")
+    #ax15.set_ylabel("Total gross Rt")
 
     ax1.set_xticks([45, 135, 45+2*90, 45+3*90])
     ax1.set_xticklabels(['Oct.','Jan.','Apr.','July'])
 
-    for ax in [ax2,ax5,ax7,ax8,ax9]:
+    for ax in [ax5,ax8,ax10,ax11,ax12]:
         ax.set_ylim(0,1)
 
     for ax in axs:
@@ -256,8 +167,6 @@ def overview_agegroups(model, path=None, silent=False, arial=False):
     
     if not silent: plt.show()
     if path!=None: fig.savefig(path)
-
-
 
 
 
@@ -704,7 +613,7 @@ def gammakernels(figure, path=None, silent=False, arial=False):
         return None 
     
     def plot_matrix(ax):
-        matrix = np.flip(parameters_agegroups.calc_Cs()[1], axis=0)
+        matrix = np.flip(parameters.calc_Cs()[1], axis=0)
         ax.imshow(matrix, origin='lower')
         ax.figure.colorbar(ax.imshow(matrix), ax=ax, cmap="YlGn")
         
@@ -737,9 +646,9 @@ def gammakernels(figure, path=None, silent=False, arial=False):
         return None 
     
     def plot_gamma_R(ax):
-        a = parameters_agegroups.params_base['a_Rt']
-        b = parameters_agegroups.params_base['b_Rt']
-        gamma_cutoff= round(parameters_agegroups.params_base['gamma_cutoff'])        
+        a = parameters.params_base['a_Rt']
+        b = parameters.params_base['b_Rt']
+        gamma_cutoff= round(parameters.params_base['gamma_cutoff'])        
         gtimes = np.arange(-gamma_cutoff, 0, 0.01)
         g = b**a * (-gtimes)**(a-1) * np.exp(-b*(-gtimes)) / gamma_func(a)
         ax.plot(gtimes, g, color=figure['cKernelR'], label='$G_R$')
@@ -750,11 +659,11 @@ def gammakernels(figure, path=None, silent=False, arial=False):
         return None
     
     def plot_gamma_vac(ax):
-        a = parameters_agegroups.params_base['a_vac']
-        b = parameters_agegroups.params_base['b_vac'] 
-        tau1 = round(parameters_agegroups.params_base['tau_vac1'])
-        tau2 = round(parameters_agegroups.params_base['tau_vac2'])
-        gamma_cutoff= round(parameters_agegroups.params_base['gamma_cutoff']+np.max([tau1,tau2]))        
+        a = parameters.params_base['a_vac']
+        b = parameters.params_base['b_vac'] 
+        tau1 = round(parameters.params_base['tau_vac1'])
+        tau2 = round(parameters.params_base['tau_vac2'])
+        gamma_cutoff= round(parameters.params_base['gamma_cutoff']+np.max([tau1,tau2]))        
         gtimes = np.arange(-gamma_cutoff, 0, 0.01)
         print(gamma_cutoff)
         gu = b**a * (-gtimes)**(a-1) * np.exp(-b*(-gtimes)) / gamma_func(a) 
@@ -772,9 +681,9 @@ def gammakernels(figure, path=None, silent=False, arial=False):
         t1 = cosmodata.datesdict['2020-10-15']
         t2 = cosmodata.datesdict['2020-12-15']
         times = np.linspace(t1, t2, t2-t1)        
-        a = parameters_agegroups.params_base['a_Rt']
-        b = parameters_agegroups.params_base['b_Rt']        
-        gamma_cutoff= round(parameters_agegroups.params_base['gamma_cutoff'])        
+        a = parameters.params_base['a_Rt']
+        b = parameters.params_base['b_Rt']        
+        gamma_cutoff= round(parameters.params_base['gamma_cutoff'])        
         gtimes = np.arange(-gamma_cutoff, 0, 1)
         g = b**a * (-gtimes)**(a-1) * np.exp(-b*(-gtimes)) / gamma_func(a)        
         convolution = []
@@ -795,11 +704,11 @@ def gammakernels(figure, path=None, silent=False, arial=False):
         t1 = cosmodata.datesdict['2020-10-15']
         t2 = cosmodata.datesdict['2021-02-15']
         times = np.linspace(t1, t2, t2-t1)        
-        a = parameters_agegroups.params_base['a_vac']
-        b = parameters_agegroups.params_base['b_vac'] 
-        tau1 = round(parameters_agegroups.params_base['tau_vac1'])
-        tau2 = round(parameters_agegroups.params_base['tau_vac2'])
-        gamma_cutoff= round(parameters_agegroups.params_base['gamma_cutoff'])        
+        a = parameters.params_base['a_vac']
+        b = parameters.params_base['b_vac'] 
+        tau1 = round(parameters.params_base['tau_vac1'])
+        tau2 = round(parameters.params_base['tau_vac2'])
+        gamma_cutoff= round(parameters.params_base['gamma_cutoff'])        
         gtimes = np.arange(-gamma_cutoff, 0, 1)
         g = b**a * (-gtimes)**(a-1) * np.exp(-b*(-gtimes)) / gamma_func(a)        
         convolution_u = []
