@@ -167,158 +167,7 @@ def overview_agegroups(model, path=None, silent=False, arial=False, scen=1):
     
     if not silent: plt.show()
     if path!=None: fig.savefig(path)
-
-
-
-def sixpanels(models, path=None, silent=False, arial=False, ICUcap=None, full_wave=None):
-    set_rcParams(arial=arial)
-    mpl.rcParams["legend.fontsize"] = 7
-
-    m1, m2, m3 = models
-    t = m1.times
-    data = [m1.chopped_data().sum(axis=2), m2.chopped_data().sum(axis=2), m3.chopped_data().sum(axis=2)]
-    AGdata = [m1.chopped_data(), m2.chopped_data(), m3.chopped_data()]
-
-    fig = plt.figure(figsize=(6., 3.5), constrained_layout=True)
-    grid = fig.add_gridspec(ncols=3, nrows=2, wspace=0.1)
-
-    ax1 = fig.add_subplot(grid[0])
-    ax2 = fig.add_subplot(grid[1], sharex=ax1)
-    ax3 = fig.add_subplot(grid[2], sharex=ax1)
-    ax4 = fig.add_subplot(grid[3], sharex=ax1)
-    ax5 = fig.add_subplot(grid[4])
-    ax6 = fig.add_subplot(grid[5])
-
-    colors = {
-        'low':'#0099B4FF', 'mid':'#00468BFF', 'high':'#1B1919FF', 'free':'#1B1919FF',
-        'lowL':'#FFFFFFFF', 'midL':'#FFFFFFFF', 'highL':'#FFFFFFFF',
-#        'lowL':'#0099B499', 'midL':'#00468B99', 'highL':'#1B191999',
-        'line':'#ADB6B6FF', 'ICUcap':'#FFAAAA',
-        'now':'#ADB6B6FF', 'nowL':'#FFFFFFFF',
-#        'now':'#93dfedFF', 'nowL':'#93dfed99',
-        'FW':'#ED0000FF',
-    }
-    main_colors = [colors['high'],colors['mid'],colors['low']]
-    main_colors_L = [colors['highL'],colors['midL'],colors['lowL']]
-
-
-
-#    ax1.plot(t[1800:], np.ones(1800), color=colors['free'])
-    def Rt(m,t):
-        return max(np.linalg.eigvals((np.moveaxis(m.Cs,0,2) * m.k_lowH(t)).sum(axis=2)))
-    
-    for i,m in enumerate([m1,m2,m3]):
-#        ax1.plot(t, np.array(list(map(m.Rt, t)))/m.R0, color=main_colors[i])
-#        ax1.plot(t, np.array(list(map(m.Rt, t))), color=main_colors[i])
-        ax1.plot(t, list(map(Rt, [m]*len(t), t)), color=main_colors[i])
-        ax2.plot(t, m.rho*(data[i][:,4]+data[i][:,5]+data[i][:,6]), color=main_colors[i])
-        ax3.plot(t, data[i][:,10]+data[i][:,11], color=main_colors[i])
-
-        phis = np.array(list(map(m.get_phis, t, AGdata[i]))).sum(axis=(2,3))
-        shift = round(m.tau_vac1/m.step_size)
-        d1a = np.roll(phis[:,0], -shift)
-        d1a[-shift:] = 0
-        shift = round(m.tau_vac1/2./m.step_size)
-        d1b = np.roll(phis[:,0], -shift)
-        d1b[-shift:] = 0
-        shift = round(m.tau_vac2/m.step_size)
-        d2 = np.roll(phis[:,1], -shift)
-        d2[-shift:] = 0
-        ax4.plot(t, d1a+d1b+d2, color=main_colors[i])
-
-    ax5.bar(1, data[0][0,1]/1e6, 0.5,
-        align='center', color=colors['now'], edgecolor='black', zorder=-1)
-    ax5.bar(1, (data[0][0,12]+data[0][0,13])/1e6, 0.5,
-        align='center', color=colors['nowL'], edgecolor='black', zorder=-1, bottom=data[0][0,1]/1e6)
-
-    offset = 0.5
-    for i in [2,4]:
-        for ab,m,j in zip([-0.5,0,0.5],[m1,m2,m3],[0,1,2]):
-            ax5.bar(offset+i+ab, data[j][900*i-1,1]/1e6, 0.5,  
-                align='center', color=main_colors[j], edgecolor='black', zorder=-1)
-            ax5.bar(offset+i+ab, (data[j][900*i-1,12]+data[j][900*i-1,13])/1e6, 0.5,
-                align='center', color=main_colors_L[j], edgecolor='black', zorder=-1,
-                    bottom=data[j][900*i-1,1]/1e6)
-            ax6.bar(offset+i+ab, data[j][900*i-1,16], 0.5, 
-                align='center', color=main_colors[j], edgecolor='black', zorder=-3)
- 
-
-
-    for ax in [ax1,ax2,ax3,ax4]:
-        ax.axvline(180, ls=':', color=colors['line'], zorder=0)
-        ax.set_xlabel('2021            2022')
-
-
-    ax1.set_ylim(0,None)
-    ax2.set_ylim(0,None)
-    ax3.set_ylim(0,None)
-    ax4.set_ylim(0,None)
-    ax5.set_ylim(0,1)
-    ax6.set_ylim(0,None)
-
-#    ax5.set_yticks([0.,0.25,0.5,0.75,1.])
-
-    ax1.set_ylabel("Contact levels\ninfluenced by NPIs")
-    ax2.set_ylabel("Daily new cases\nper million")
-    ax3.set_ylabel("ICU occupancy\nper million")
-#    ax4.set_ylabel("Reproduction number")
-    ax4.set_ylabel("Daily vaccinations\nper million")
-    ax5.set_ylabel("Immune fraction\nof the population")
-    ax6.set_ylabel("Total deaths\nper million")
-
-    #Panel 1
-    ax1.text(0,1+0.05,'Scenario 1', size=7, color=colors['high'])
-    ax1.text(0,0.75+0.05,'Scenario 2', size=7, color=colors['mid'])
-    ax1.text(0,0.5+0.05,'Scenario 3', size=7, color=colors['low'])
-    ax1.text(200,0.5+0.05,'No restrictions', size=7, color=colors['line'])
-    
-    #Lifting of restrictions
-    ax1.text(0.54,0.05,'Lifting of\nrestrictions', size=7, color=colors['line'], transform=ax1.transAxes)
-    for ax in [ax2,ax3,ax4]:
-        l,u = ax.get_ylim()
-        ax.set_ylim(l,u+0.15*(u-l))
-        ax.text(0.54,0.9,'Lifting of\nrestrictions', size=7, color=colors['line'], transform=ax.transAxes)
-
-    for ax, label in zip([ax1,ax2,ax3,ax4,ax5,ax6], ['A','B','C','D','E','F']):
-        ax.text(-.12,1.1,label, size=12, weight='bold', color='black', transform=ax.transAxes)
-
-    if ICUcap != None:
-        ax3.axhspan(ICUcap-2,ICUcap+2, xmax=0.92, facecolor=colors['ICUcap'], edgecolor=None, zorder=-1)
-        ax3.text(1.0,0.3,'ICU capacity', size=7, color='red', rotation=-90, transform=ax3.transAxes)
-        ax3.scatter(380,ICUcap, marker="<", color='grey')
-
-    if full_wave != None:
-        m = full_wave
-        d = m.chopped_data().sum(axis=2)
-        ax2.plot(t, m.rho*(d[:,4]+d[:,5]+d[:,6]), color=colors['FW'], ls=':')
-        ax3.plot(t, d[:,10]+d[:,11], color=colors['FW'], ls=':')
-        ax2.text(0.58,0.72,'Full wave', size=7, color=colors['FW'], transform=ax2.transAxes)
-        ax3.text(0.58,0.72,'Full wave', size=7, color=colors['FW'], transform=ax3.transAxes)
-
-    ax1.set_xticks([45, 135, 45+2*90, 45+3*90])
-    ax1.set_xticklabels(['Oct.','Jan.','Apr.','July'])
-
-
-    ax5_x = [1,offset+2,offset+4]
-    ax5labels=['Initial','After\nwinter', 'After\none year']
-    ax5.set_xticks(ax5_x)
-    ax5.set_xticklabels(ax5labels)
-
-    ax6_x = [offset+2,offset+4]
-    ax6labels=['After\nwinter', 'After\none year']
-    ax6.set_xticks(ax6_x)
-    ax6.set_xticklabels(ax6labels)
-
-    handles = [mpl.patches.Patch(facecolor=colors['highL'], edgecolor='black', label='By infection'),
-               mpl.patches.Patch(facecolor=colors['high'], edgecolor='black', label='By vaccination')]
-    ax5.legend(handles=handles, bbox_to_anchor=(0.1,0.9), ncol=1, frameon=False)
-
-    fig.align_ylabels()
-
-    if not silent: plt.show()
-    if path!=None: fig.savefig(path)
-        
-        
+                
 
         
 def motivation(figure, path=None, silent=False, arial=False):
@@ -1015,3 +864,331 @@ def sixpanels_flexible(models, figure, path=None, silent=False, arial=False, ICU
 
     if not silent: plt.show()
     if path!=None: fig.savefig(path)
+
+
+
+
+# General Plotting Utility
+
+cm = 1/2.54
+
+base_colors = {
+    'low':'#0099B4FF', 'mid':'#00468BFF', 'high':'#1B1919FF', 'free':'#1B1919FF',
+    'lowL':'#FFFFFFFF', 'midL':'#FFFFFFFF', 'highL':'#FFFFFFFF',
+    'line':'#ADB6B6FF', 'ICUcap':'red',
+    'now':'#ADB6B6FF', 'nowL':'#FFFFFFFF',
+    'FW':'#ED0000FF',
+    'sus':'#FF8000FF',
+}
+
+def plot_axes_winter(ax):
+    ax.axvline(180, ls=':', color='gray', zorder=-4)
+    ax.set_xlabel('2021          2022')
+#    ax.set_xticks([45, 45+1*90, 45+2*90, 45+3*90])
+#    ax.set_xticklabels(['Oct.','Jan.','Apr.','July'])
+    ax.set_xticks([1*90-30, 2*90, 3*90+30])
+    ax.set_xticklabels(['Nov.','Mar.','July'])
+    return None
+
+
+
+
+# Single Panel Functions
+
+def plot_NPI(ax, ms, colors, names=None, **kwargs):
+
+    def Rt(m,t):
+        tmp = m.k_lowH(t)
+        tmp[0] *= tmp[1:].sum()/3.
+        return max(np.linalg.eigvals((np.moveaxis(m.Cs,0,2) * tmp).sum(axis=2)))
+
+    t = ms[0].times
+    for i, m in enumerate(ms):
+        ax.plot(t, list(map(Rt, [m]*len(t), t)), color=colors[i], zorder=1-i/10)
+    plot_axes_winter(ax)
+    ax.set_ylim(0,None)
+    ax.set_ylabel("Contact reduction\nby mandatory NPIs")
+    ax.text(0.54,0.06,'Lifting of\nrestrictions', size=7, color='gray', transform=ax.transAxes)
+    if names != None:
+        for i,name in enumerate(names):
+            ax.text(0.6, 0.83-0.14*i, name, size=7, color=colors[i], transform=ax.transAxes)
+    return None
+
+def plot_Rt_eigenvalue(ax, ms, colors, full_wave=None, **kwargs):
+    t = ms[0].times
+    for i, m in enumerate(ms):
+        ax.plot(t, np.array(list(map(m.Rt,t))).mean(axis=1), color=colors[i], zorder=1-i/10)
+    if full_wave != None:
+        ax.plot(t, np.array(list(map(full_wave.Rt,t))).mean(axis=1), color=base_colors['FW'], ls=':', zorder=0)
+        ax.text(0.55, 0.9, 'full wave', size=7, color=base_colors['FW'], transform=ax.transAxes)
+    plot_axes_winter(ax)
+    ax.set_ylim(0,None)
+    ax.set_ylabel("Driving force\nof infections")
+
+    ax.yaxis.set_major_formatter(mpl.ticker.FormatStrFormatter('%.1f'))
+
+    return None 
+
+def plot_incidence(ax, ms, colors, full_wave=None, **kwargs):
+    t = ms[0].times
+    data = [m.chopped_data().sum(axis=2) for m in ms]
+    for i, m in enumerate(ms):
+        ax.plot(t, m.rho*(data[i][:,4]+data[i][:,5]+data[i][:,6])/1e3, color=colors[i], zorder=1-i/10)
+    ax.set_ylabel("Daily new cases\nper million")
+    plot_axes_winter(ax)
+    ax.set_ylim(0,None)
+    if full_wave != None:
+        d = full_wave.chopped_data().sum(axis=2)
+        ax.plot(t, full_wave.rho*(d[:,4]+d[:,5]+d[:,6])/1e3, color=base_colors['FW'], ls=':', zorder=0)
+    ax.yaxis.set_major_formatter(mpl.ticker.FormatStrFormatter(r'$%d\mathrm{k}$'))
+    return None
+
+def plot_ICU(ax, ms, colors, full_wave=None, ICUcap=None, **kwargs):
+    t = ms[0].times
+    data = [m.chopped_data().sum(axis=2) for m in ms]
+    for i, m in enumerate(ms):
+        ax.plot(t, data[i][:,10]+data[i][:,11], color=colors[i], zorder=1-i/10)
+    ax.set_ylabel("ICU occupancy\nper million")
+    plot_axes_winter(ax)
+    ax.set_ylim(0,None)
+    if full_wave != None:
+        mfull = full_wave
+        d = mfull.chopped_data().sum(axis=2)
+        ax.plot(t, d[:,10]+d[:,11], color=base_colors['FW'], ls=':', zorder=0)
+        
+    if ICUcap != None:
+        maxicu = 0
+        for i, m in enumerate(ms):
+            if np.max((data[i][:,10]+data[i][:,11])) >= maxicu:
+                maxicu = np.max(data[i][:,10]+data[i][:,11])
+        if maxicu >= ICUcap-5:
+            ylim = ax.get_ylim()
+            ax.hlines(ICUcap,0, 0.95*360, color='black', ls='--', zorder=-1)
+            #ax.axhspan(ICUcap-1,ICUcap+1, alpha=0.8, xmax=0.9, facecolor=colors['ICUcap'], edgecolor=None, zorder=-1)
+            ax.text(1.0,ICUcap/ylim[1]-0.2,'Approximate\nICU capacity', size=7, color='black', rotation=-90, transform=ax.transAxes)
+            ax.scatter(370,ICUcap+1, marker="<", color='black')
+    return None
+
+def plot_vaccinations(ax, ms, colors, **kwargs):
+    t = ms[0].times
+    AGdata = [m.chopped_data() for m in ms]
+    for i,m in enumerate(ms):
+        phis = np.array(list(map(m.get_phis, t, AGdata[i]))).sum(axis=(2,3))
+        shift = round(m.tau_vac1/m.step_size)
+        d1a = np.roll(phis[:,0], -shift)
+        d1a[-shift:] = 0
+        shift = round(m.tau_vac1/2./m.step_size)
+        d1b = np.roll(phis[:,0], -shift)
+        d1b[-shift:] = 0
+        shift = round(m.tau_vac2/m.step_size)
+        d2 = np.roll(phis[:,1], -shift)
+        d2[-shift:] = 0
+        ax.plot(t, (d1a+d1b+d2)/1e4, color=colors[i], zorder=1-i/10)
+    ax.set_ylabel("Daily vaccinations\nin percent of population")
+    plot_axes_winter(ax)
+    ax.set_ylim(0,None)
+#    ax.yaxis.set_major_formatter(mpl.ticker.FormatStrFormatter('%.1f'))
+
+    ylim = ax.get_ylim()
+    ax.set_yticks([0,0.5,1,1.5,2])
+    ax.set_ylim(ylim)
+
+    return None 
+
+def plot_bar_immunity(ax, ms, colors, **kwargs):
+    t = ms[0].times
+    data = [m.chopped_data().sum(axis=2) for m in ms]
+    m1,m2,m3 = ms
+    ax.bar(1, data[0][0,1]/1e6, 0.5, align='center', color=base_colors['now'], edgecolor='black', zorder=-1)
+    ax.bar(1, (data[0][0,12]+data[0][0,13])/1e6, 0.5, align='center', 
+           color=base_colors['nowL'], edgecolor='black', zorder=-1, bottom=data[0][0,1]/1e6)
+    offset = 0.5
+    for i in [2,4]:
+        for ab,m,j in zip([-0.5,0,0.5],[m1,m2,m3],[0,1,2]):
+            ax.bar(offset+i+ab, data[j][900*i-1,1]/1e6, 0.5,  
+                align='center', color=colors[j], edgecolor='black', zorder=-1)
+            ax.bar(offset+i+ab, (data[j][900*i-1,12]+data[j][900*i-1,13])/1e6, 0.5,
+                align='center', color='#FFFFFFFF', edgecolor='black', zorder=-1,
+                    bottom=data[j][900*i-1,1]/1e6)
+    ax.set_ylim(0,1)
+    ax.set_ylabel("Immune fraction\nof the population")
+    ax_x = [1,offset+2,offset+4]
+    axlabels=['Initial','Mar.\n2022', 'Sept.\n2022']
+    ax.set_xticks(ax_x)
+    ax.set_xticklabels(axlabels)
+    handles = [mpl.patches.Patch(facecolor='#FFFFFFFF', edgecolor='black', label='recovered'),
+           mpl.patches.Patch(facecolor=colors[0], edgecolor='black', label='vaccinated')]
+    ax.legend(handles=handles, loc='lower left', bbox_to_anchor=(0.1,0.9), ncol=1, frameon=False)
+    return None
+
+def plot_bar_compartments(ax, ms, colors, **kwargs):
+    t = ms[0].times
+    data = [m.chopped_data().sum(axis=2) for m in ms]
+    m1,m2,m3 = ms
+    vaccinated = (data[0][0,1]) /1e6
+    recovered = (data[0][0,12]+data[0][0,13]) /1e6
+    waned = (data[0][0,2]+data[0][0,3]) /1e6
+    susceptible = (data[0][0,0]) /1e6
+    ax.bar(1, vaccinated, 0.5, align='center', color=base_colors['now'], edgecolor='black', zorder=-1)
+    ax.bar(1, recovered, 0.5, align='center', color='#FFFFFFFF', edgecolor='black', zorder=-1,
+        bottom=vaccinated)
+    ax.bar(1, recovered, 0.5, align='center', color=base_colors['now'], alpha=0.5, edgecolor='black', zorder=-1,
+        bottom=vaccinated)
+    ax.bar(1, waned, 0.5, align='center', color='#FFFFFFFF', edgecolor='black', zorder=-1,
+        bottom=vaccinated+recovered)
+    ax.bar(1, susceptible, 0.5, align='center', color=base_colors['sus'], edgecolor='black', zorder=-1,
+        bottom=vaccinated+recovered+waned)
+    offset = 0.5
+    for i in [2,4]:
+        for ab,m,j in zip([-0.5,0,0.5],[m1,m2,m3],[0,1,2]):
+            vaccinated = (data[j][900*i-1,1]) /1e6
+            recovered = (data[j][900*i-1,12]+data[j][900*i-1,13]) /1e6
+            waned = (data[j][900*i-1,2]+data[j][900*i-1,3]) /1e6
+            susceptible = (data[j][900*i-1,0]) /1e6
+            ax.bar(offset+i+ab, vaccinated, 0.5,  
+                align='center', color=colors[j], edgecolor='black', zorder=-1)
+            ax.bar(offset+i+ab, recovered, 0.5,
+                align='center', color='#FFFFFFFF', edgecolor='black', zorder=-1,
+                    bottom=vaccinated)
+            ax.bar(offset+i+ab, recovered, 0.5,
+                align='center', color=colors[j], alpha=0.5, edgecolor='black', zorder=-1,
+                    bottom=vaccinated)
+            ax.bar(offset+i+ab, waned, 0.5,
+                align='center', color='#FFFFFFFF', edgecolor='black', zorder=-1,
+                    bottom=vaccinated+recovered)
+            ax.bar(offset+i+ab, susceptible, 0.5,
+                align='center', color=base_colors['sus'], edgecolor='black', zorder=-1,
+                    bottom=vaccinated+recovered+waned)
+    ax.set_ylim(0,None)
+    ax.set_ylabel("Immunity status\nof the population")
+    ax_x = [1,offset+2,offset+4]
+    axlabels=['Initial','Mar.\n2022', 'Sept.\n2022']
+    ax.set_xticks(ax_x)
+    ax.set_xticklabels(axlabels)
+    handles = [mpl.patches.Patch(facecolor=base_colors['sus'], edgecolor='black', label='susceptible'),
+               mpl.patches.Patch(facecolor='#FFFFFFFF', edgecolor='black', label='waned'),
+               mpl.patches.Patch(facecolor=colors[1], alpha=0.5, edgecolor='black', label='recovered'),
+               mpl.patches.Patch(facecolor=colors[1], edgecolor='black', label='vaccinated')]
+    ax.legend(handles=handles, loc='lower left', bbox_to_anchor=(0.1,0.9), ncol=1, frameon=False, labelspacing=0.2)
+    return None
+
+def plot_bar_deaths(ax, ms, colors, **kwargs):
+    t = ms[0].times
+    data = [m.chopped_data().sum(axis=2) for m in ms]
+    m1,m2,m3 = ms
+    offset = 0.5
+    for i in [2,4]:
+        for ab,m,j in zip([-0.5,0,0.5],[m1,m2,m3],[0,1,2]):
+            ax.bar(offset+i+ab, data[j][900*i-1,17], 0.5, 
+                align='center', color=colors[j], edgecolor='black', zorder=-3)
+            ax.bar(offset+i+ab, data[j][900*i-1,16], 0.5,
+                align='center', color='#FFFFFFFF', edgecolor='black', zorder=-1,
+                    bottom=data[j][900*i-1,17])
+    ax.set_ylim(0,None)
+    ax.set_ylabel("Cumulative deaths\nper million")
+    ax_x = [offset+2,offset+4]
+    axlabels=['Until\nMar. \'22', 'Until\nSept. \'22']
+    ax.set_xticks(ax_x)
+    ax.set_xticklabels(axlabels)
+    handles = [mpl.patches.Patch(facecolor='#FFFFFFFF', edgecolor='black', label='unvaccinated'),
+           mpl.patches.Patch(facecolor=colors[0], edgecolor='black', label='vaccinated')]
+    ax.legend(handles=handles, loc='lower left', bbox_to_anchor=(0.1,0.9), ncol=1, frameon=False)
+    return None
+
+def plot_selfregulation(ax, ms, colors, **kwargs):
+
+    def selfregulation(m):
+        def func(t):
+            tmp = m.k_lowH(t)
+            tmp[0] *= tmp[1:].sum()/3.
+            base = max(np.linalg.eigvals((np.moveaxis(m.Cs,0,2) * tmp).sum(axis=2)))
+            tmp = m.k_highH(t)
+            tmp[0] *= tmp[1:].sum()/3.
+            full = max(np.linalg.eigvals((np.moveaxis(m.Cs,0,2) * tmp).sum(axis=2)))
+            reduced = max(np.linalg.eigvals((np.moveaxis(m.Cs,0,2) * m.k_selfregulation(t)).sum(axis=2)))
+            return 1-(base-reduced)/(base-full)
+        return func
+
+    t = ms[0].times
+    for i,m in enumerate(ms):
+        ax.plot(t, list(map(selfregulation(m),t)), color=colors[i], zorder=1-i/10)
+    plot_axes_winter(ax)
+    ax.set_ylim(0,None)
+    ax.set_ylabel('Modulation of\nvoluntary contacts')
+    return None
+
+def plot_seasonality(ax, ms, colors, **kwargs):
+    m = ms[0]
+    ax.plot(m.times, m.beta/m.gamma[0]*m.Gamma(m.times), color='black')
+    plot_axes_winter(ax)
+    ax.set_ylim(0,None)
+    ax.set_ylabel('Seasonal $R_0$')
+    return None
+
+
+paneldict = {
+    'NPI': plot_NPI,
+    'Incidence': plot_incidence,
+    'ICU': plot_ICU,
+    'Vaccines': plot_vaccinations,
+    'Immunity': plot_bar_immunity,
+    'Compartments': plot_bar_compartments,
+    'Deaths': plot_bar_deaths,
+    'Selfregulation': plot_selfregulation,
+    'Rt_EV': plot_Rt_eigenvalue,
+    'Seasonality': plot_seasonality,
+#    'Rt_OBS': plot_Rt_observed,
+#    'Rt_OBS2': plot_Rt_observed2,
+#    'Patients': plot_bar_patients
+}
+
+
+
+
+
+
+
+def sixpanels(ms, panels, colors, path=None, arial=False, **kwargs):
+    set_rcParams(arial=arial)
+
+    fig = plt.figure(figsize=(18*cm, 10.5*cm), constrained_layout=True)
+    grid = fig.add_gridspec(ncols=3, nrows=2, wspace=0.1)
+
+    axs = [0]*6
+    for i,g in enumerate(grid):
+        axs[i] = fig.add_subplot(g)
+
+    for ax,name in zip(axs,['ax1','ax2','ax3','ax4','ax5','ax6']):
+        paneldict[panels[name]](ax, ms, colors, **kwargs)
+
+    for ax,label in zip(axs, ['a','b','c','d','e','f']):
+        ax.text(-.12,1.1,label, size=12, weight='bold', color='black', transform=ax.transAxes)
+
+    fig.align_ylabels()
+
+    plt.show()
+    if path!=None: fig.savefig(path)
+
+
+def eightpanels(ms, panels, colors, path=None, arial=False, **kwargs):
+    set_rcParams(arial=arial)
+
+    fig = plt.figure(figsize=(18*cm, 8*cm), constrained_layout=True)
+    grid = fig.add_gridspec(ncols=4, nrows=2, wspace=0.1)
+
+    axs = [0]*8
+    for i,g in enumerate(grid):
+        axs[i] = fig.add_subplot(g)
+
+    for ax,name in zip(axs,['ax1','ax2','ax3','ax4','ax5','ax6','ax7','ax8']):
+        paneldict[panels[name]](ax, ms, colors, **kwargs)
+
+    for ax,label in zip(axs, ['a','b','c','d','e','f','g','h']):
+        ax.text(-.1,1.1,label, size=12, weight='bold', color='black', transform=ax.transAxes)
+
+    fig.align_ylabels()
+
+    plt.show()
+    if path!=None: fig.savefig(path)
+
+
